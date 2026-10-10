@@ -63,11 +63,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 .home-page { padding-top: 14px; }
 .hero-section {
-  position: relative; display: grid; grid-template-columns: 1.06fr .94fr; align-items: center; gap: 4%;
-  min-height: 570px; padding: 70px 6.5% 66px; overflow: hidden; border: 1px solid #e8eee8;
+  position: relative; display: grid; grid-template-columns: 1fr; align-items: center; gap: 4%;
+  min-height: 500px; padding: 70px 6.5% 66px; overflow: hidden; border: 1px solid #e8eee8;
   border-radius: 27px; background: radial-gradient(ellipse at 87% 34%, rgba(211, 240, 219, .54), transparent 37%), #fff;
 }
-.hero-copy { position: relative; z-index: 1; max-width: 610px; }
+.hero-copy { position: relative; z-index: 1; max-width: 800px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 9px; margin-bottom: 23px; color: var(--green); font-size: .77rem; font-weight: 760; letter-spacing: .085em; text-transform: uppercase; }
 .eyebrow-dot { width: 8px; height: 8px; border-radius: 50%; background: #3eae71; box-shadow: 0 0 0 4px #e4f5e9; }
 .hero-copy h1 { max-width: 630px; margin: 0; color: #163327; font-size: clamp(2.8rem, 5vw, 4.5rem); font-weight: 690; letter-spacing: -.075em; line-height: 1.035; }
@@ -149,7 +149,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 .container { padding-top: 43px; }
 .page-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
-.summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 22px; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 22px; }
 .summary-card { display: flex; flex-direction: column; gap: 11px; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 0 5px 18px rgba(26, 59, 43, .035); }
 .summary-card.accent { color: #fff; background: var(--green); }
 .summary-card span { color: #87938b; font-size: .78rem; }
@@ -158,6 +158,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .summary-card.accent strong { color: #fff; }
 .analysis-layout { display: grid; grid-template-columns: 1.1fr .9fr; gap: 16px; margin-bottom: 16px; }
 .analysis-layout.two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.analysis-layout.dashboard-analysis { grid-template-columns: 1.1fr .9fr 1fr; }
+.dashboard-snapshot-panel { display: grid; align-content: center; justify-items: center; min-width: 0; }
+.dashboard-snapshot { width: 100%; padding: 0; border: 0; box-shadow: none; transform: none; }
+.score-guide { margin-bottom: 16px; }
+.score-guide h3 { margin-bottom: 10px; }
+.score-guide table { width: 100%; border-collapse: collapse; }
+.score-guide th, .score-guide td { padding: 9px 12px; border-bottom: 1px solid #edf1ed; text-align: left; font-size: .84rem; }
+.score-guide th { color: #78877e; background: #f8faf8; font-size: .75rem; font-weight: 700; }
+.score-guide td:first-child { color: #34724d; font-weight: 700; white-space: nowrap; }
 .panel { padding: 23px; border: 1px solid var(--line); border-radius: 17px; background: #fff; box-shadow: 0 6px 22px rgba(26, 59, 43, .035); }
 .panel h3 { margin: 0 0 17px; color: #264334; font-size: 1.08rem; letter-spacing: -.025em; }
 .section-list { display: flex; flex-direction: column; gap: 15px; }
@@ -205,6 +214,8 @@ input:focus, textarea:focus { border-color: #75b68c; outline: 3px solid rgba(45,
   .hero-copy { max-width: 760px; }
   .hero-visual { min-height: 390px; }
   .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .analysis-layout.dashboard-analysis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-snapshot-panel { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
   .app-shell { padding: 10px 16px 34px; }
@@ -221,6 +232,8 @@ input:focus, textarea:focus { border-color: #75b68c; outline: 3px solid rgba(45,
   .feature-grid, .step-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .analysis-layout, .analysis-layout.two-col, .job-form-grid { grid-template-columns: 1fr; }
+  .analysis-layout.dashboard-analysis { grid-template-columns: 1fr; }
+  .dashboard-snapshot-panel { grid-column: auto; }
   .history-page { overflow-x: auto; }
   .history-page table { min-width: 720px; }
 }

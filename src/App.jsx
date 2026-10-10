@@ -144,30 +144,6 @@ function HomePage({ onGetStarted }) {
           </div>
         </div>
 
-        <div className="hero-visual">
-          <div className="visual-orbit visual-orbit-one" />
-          <div className="visual-orbit visual-orbit-two" />
-          <div className="hero-card">
-            <div className="preview-header">
-              <div><span className="preview-kicker">RESUME SNAPSHOT</span><strong>Your profile, at a glance</strong></div>
-              <span className="preview-menu" aria-hidden="true">···</span>
-            </div>
-            <div className="score-summary">
-              <div className="score-ring"><span>82<small>/100</small></span></div>
-              <div className="score-caption"><strong>Looking good</strong><span>Your resume is on the right track.</span><div className="score-track"><span /></div></div>
-            </div>
-            <div className="mini-card">
-              <div className="mini-card-heading"><strong>Top matching skills</strong><span>3 found</span></div>
-              <ul>
-                <li><span className="skill-check">✓</span> Java <span className="skill-level">Strong</span></li>
-                <li><span className="skill-check">✓</span> Spring Boot <span className="skill-level">Strong</span></li>
-                <li><span className="skill-check">✓</span> SQL <span className="skill-level">Good</span></li>
-              </ul>
-            </div>
-            <div className="preview-footer"><span className="preview-status-dot" /> Analysis ready <span>Just now</span></div>
-          </div>
-          <div className="floating-note"><span>✳</span><div><strong>Stand out with confidence</strong><small>One clear next step at a time</small></div></div>
-        </div>
       </section>
 
       <section className="features-section">
@@ -301,8 +277,7 @@ function AuthDialog({ mode, onClose, onSuccess }) {
 
 function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSelectedResumeId, onLogin }) {
   const [resumeFile, setResumeFile] = useState(null);
-  const [jobTitle, setJobTitle] = useState('Full Stack Java Developer');
-  const [jobDescription, setJobDescription] = useState('We are looking for a Full Stack Java Developer with experience in Java, Spring Boot, SQL, REST API, Git, and agile development.');
+  const [jobTitle, setJobTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
 
@@ -322,8 +297,9 @@ function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSele
     const formData = new FormData();
     formData.append('file', resumeFile);
     formData.append('userId', String(currentUser.userId));
-    formData.append('jobTitle', jobTitle);
-    formData.append('jobDescription', jobDescription);
+    if (jobTitle.trim()) {
+      formData.append('jobTitle', jobTitle.trim());
+    }
 
     try {
       const uploadRes = await fetch(`${API_BASE}/resumes/upload`, {
@@ -337,7 +313,7 @@ function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSele
       const resumeId = uploaded.id;
       setSelectedResumeId(resumeId);
 
-      const analysisRes = await fetch(`${API_BASE}/analysis/${resumeId}?jobDescription=${encodeURIComponent(jobDescription)}`, {
+      const analysisRes = await fetch(`${API_BASE}/analysis/${resumeId}`, {
         method: 'POST',
       });
       const analysisData = await analysisRes.json();
@@ -379,24 +355,16 @@ function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSele
           <span className="eyebrow">Dashboard</span>
           <h2>Welcome back{currentUser ? `, ${currentUser.name}` : ''}</h2>
         </div>
-        <button className="primary" onClick={handleUpload} disabled={isLoading}>
-          {isLoading ? 'Analyzing...' : 'Upload Resume'}
-        </button>
       </section>
 
       <div className="upload-panel panel">
-        <div className="form-grid two-col">
-          <div>
-            <label>Resume file</label>
-            <input type="file" accept=".pdf,.docx,.txt" onChange={(e) => setResumeFile(e.target.files[0])} />
-          </div>
-          <div>
-            <label>Target job title</label>
-            <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
-          </div>
-        </div>
-        <label>Job description</label>
-        <textarea rows="7" value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} />
+        <label>Resume file</label>
+        <input type="file" accept=".pdf,.docx,.txt" onChange={(e) => setResumeFile(e.target.files[0])} />
+        <label>Job title</label>
+        <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="e.g. Software Engineer" />
+        <button className="primary" onClick={handleUpload} disabled={isLoading}>
+          {isLoading ? 'Analyzing...' : 'Analyze Resume'}
+        </button>
         {statusText && <div className="status-box">{statusText}</div>}
       </div>
 
@@ -414,16 +382,30 @@ function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSele
           <strong>{analysis.missingSkills?.length ?? 0}</strong>
         </div>
         <div className="summary-card">
-          <span>Job Match %</span>
-          <strong>78%</strong>
-        </div>
-        <div className="summary-card">
           <span>Suggestions</span>
           <strong>{analysis.suggestions?.length ?? 0}</strong>
         </div>
       </div>
 
-      <div className="analysis-layout">
+      <section className="panel score-guide">
+        <h3>Resume score meaning</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Score</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>90–100</td><td>Excellent match</td></tr>
+            <tr><td>75–89</td><td>Good resume; minor improvements needed</td></tr>
+            <tr><td>60–74</td><td>Average; improvements recommended</td></tr>
+            <tr><td>Below 60</td><td>Needs significant improvement</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <div className="analysis-layout dashboard-analysis">
         <div className="panel">
           <h3>Section Analysis</h3>
           <div className="section-list">
@@ -451,6 +433,35 @@ function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSele
             {(analysis.missingSkills ?? []).map((skill) => (
               <span className="skill-badge secondary" key={skill}>{skill}</span>
             ))}
+          </div>
+        </div>
+
+        <div className="panel dashboard-snapshot-panel">
+          <div className="hero-card dashboard-snapshot">
+            <div className="preview-header">
+              <div><span className="preview-kicker">RESUME SNAPSHOT</span><strong>Your profile, at a glance</strong></div>
+              <span className="preview-menu" aria-hidden="true">···</span>
+            </div>
+            <div className="score-summary">
+              <div className="score-ring" style={{ background: `conic-gradient(#319664 0 ${analysis.score ?? 0}%, #e9f1eb ${analysis.score ?? 0}% 100%)` }}>
+                <span>{analysis.score ?? 0}<small>/100</small></span>
+              </div>
+              <div className="score-caption">
+                <strong>{(analysis.score ?? 0) >= 80 ? 'Looking good' : 'Room to grow'}</strong>
+                <span>Your resume score at a glance.</span>
+                <div className="score-track"><span style={{ width: `${analysis.score ?? 0}%` }} /></div>
+              </div>
+            </div>
+            <div className="mini-card">
+              <div className="mini-card-heading"><strong>Detected skills</strong><span>{(analysis.skills ?? []).length} found</span></div>
+              <ul>
+                {(analysis.skills ?? []).slice(0, 3).map((skill) => (
+                  <li key={skill}><span className="skill-check">✓</span> {skill} <span className="skill-level">Found</span></li>
+                ))}
+                {!analysis.skills?.length && <li>Analyze a resume to see detected skills.</li>}
+              </ul>
+            </div>
+            <div className="preview-footer"><span className="preview-status-dot" /> Analysis snapshot <span>Current</span></div>
           </div>
         </div>
       </div>
