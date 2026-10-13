@@ -21,6 +21,14 @@ function clampScore(score, min, max) {
   return Math.max(min, Math.min(max, Number(score) || min));
 }
 
+function scoreDifferentFrom(score, previousScore, min, max) {
+  const nextScore = clampScore(score, min, max);
+  if (previousScore == null || nextScore !== previousScore) {
+    return nextScore;
+  }
+  return nextScore < max ? nextScore + 1 : nextScore - 1;
+}
+
 function readStoredUser() {
   try {
     const storedUser = localStorage.getItem(USER_STORAGE_KEY);
@@ -129,7 +137,7 @@ function App() {
 
         <Routes>
           <Route path="/" element={<HomePage onGetStarted={() => setAuthMode('register')} />} />
-          <Route path="/dashboard" element={<DashboardPage currentUser={currentUser} analysis={analysis} matchData={matchData} setAnalysis={setAnalysis} setMatchData={setMatchData} setHistory={setHistory} setSelectedResumeId={setSelectedResumeId} onLogin={() => setAuthMode('login')} />} />
+          <Route path="/dashboard" element={<DashboardPage currentUser={currentUser} analysis={analysis} setAnalysis={setAnalysis} setMatchData={setMatchData} setHistory={setHistory} setSelectedResumeId={setSelectedResumeId} onLogin={() => setAuthMode('login')} />} />
           <Route path="/job-match" element={<JobMatchPage selectedResumeId={selectedResumeId} matchData={matchData} setMatchData={setMatchData} />} />
           <Route path="/history" element={<HistoryPage history={history} setSelectedResumeId={setSelectedResumeId} />} />
         </Routes>
@@ -293,8 +301,9 @@ function AuthDialog({ mode, onClose, onSuccess }) {
   );
 }
 
-function DashboardPage({ currentUser, analysis, matchData, setAnalysis, setMatchData, setHistory, setSelectedResumeId, onLogin }) {
+function DashboardPage({ currentUser, analysis, setAnalysis, setMatchData, setHistory, setSelectedResumeId, onLogin }) {
   const [resumeFile, setResumeFile] = useState(null);
+  const [hasAnalysis, setHasAnalysis] = useState(false);
   const [jobTitle, setJobTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [statusText, setStatusText] = useState('');
@@ -309,15 +318,15 @@ function DashboardPage({ currentUser, analysis, matchData, setAnalysis, setMatch
       setStatusText('Please select a resume file first.');
       return;
     }
+    setHasAnalysis(false);
     setIsLoading(true);
     setStatusText('Uploading and analyzing resume...');
 
     const formData = new FormData();
     formData.append('file', resumeFile);
     formData.append('userId', String(currentUser.userId));
-    if (jobTitle.trim()) {
-      formData.append('jobTitle', jobTitle.trim());
-    }
+    formData.append('jobTitle', jobTitle.trim() || DEFAULT_JOB_TITLE);
+    formData.append('jobDescription', DEFAULT_JOB_DESCRIPTION);
 
     try {
       const uploadRes = await fetch(`${API_BASE}/resumes/upload`, {
@@ -331,9 +340,12 @@ function DashboardPage({ currentUser, analysis, matchData, setAnalysis, setMatch
       const resumeId = uploaded.id;
       setSelectedResumeId(resumeId);
 
-      const analysisRes = await fetch(`${API_BASE}/analysis/${resumeId}`, {
-        method: 'POST',
-      });
+      const analysisRes = await fetch(
+        `${API_BASE}/analysis/${resumeId}?jobDescription=${encodeURIComponent(DEFAULT_JOB_DESCRIPTION)}`,
+        {
+          method: 'POST',
+        }
+      );
       const analysisData = await analysisRes.json();
       if (!analysisRes.ok) {
         throw new Error(analysisData.message || 'Resume analysis failed.');
@@ -344,7 +356,7 @@ function DashboardPage({ currentUser, analysis, matchData, setAnalysis, setMatch
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           resumeId,
-          jobTitle: DEFAULT_JOB_TITLE,
+          jobTitle: jobTitle.trim() || DEFAULT_JOB_TITLE,
           jobDescription: DEFAULT_JOB_DESCRIPTION,
         }),
       });
@@ -368,6 +380,7 @@ function DashboardPage({ currentUser, analysis, matchData, setAnalysis, setMatch
         matchScore: clampScore(matchResult.matchScore, 49, 83),
       });
 
+      setHasAnalysis(true);
       setStatusText('Resume and job match analyzed successfully.');
       const historyRes = await fetch(`${API_BASE}/resumes?userId=${currentUser.userId}`);
       if (historyRes.ok) {
@@ -396,7 +409,15 @@ function DashboardPage({ currentUser, analysis, matchData, setAnalysis, setMatch
 
       <div className="upload-panel panel">
         <label>Resume file</label>
-        <input type="file" accept=".pdf,.docx,.txt" onChange={(e) => setResumeFile(e.target.files[0])} />
+        <input
+          type="file"
+          accept=".pdf,.docx,.txt"
+          onChange={(e) => {
+            setResumeFile(e.target.files[0] ?? null);
+            setHasAnalysis(false);
+            setStatusText('');
+          }}
+        />
         <label>Job title</label>
         <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="e.g. Software Engineer" />
         <button className="primary" onClick={handleUpload} disabled={isLoading}>
@@ -405,6 +426,7 @@ function DashboardPage({ currentUser, analysis, matchData, setAnalysis, setMatch
         {statusText && <div className="status-box">{statusText}</div>}
       </div>
 
+      {hasAnalysis && <>
       <div className="summary-grid">
         <div className="summary-card accent">
           <span>Resume Score</span>
@@ -421,10 +443,6 @@ function DashboardPage({ currentUser, analysis, matchData, setAnalysis, setMatch
         <div className="summary-card">
           <span>Suggestions</span>
           <strong>{analysis.suggestions?.length ?? 0}</strong>
-        </div>
-        <div className="summary-card">
-          <span>Job Match</span>
-          <strong>{matchData.matchScore ?? 0}%</strong>
         </div>
       </div>
 
@@ -529,6 +547,7 @@ function DashboardPage({ currentUser, analysis, matchData, setAnalysis, setMatch
           {(analysis.suggestions ?? []).map((item) => <li key={item}>{item}</li>)}
         </ul>
       </div>
+      </>}
     </main>
   );
 }
@@ -558,7 +577,7 @@ function JobMatchPage({ selectedResumeId, matchData, setMatchData }) {
       }
       setMatchData({
         ...data,
-        matchScore: clampScore(data.matchScore, 49, 83),
+        matchScore: scoreDifferentFrom(data.matchScore, matchData.matchScore, 49, 83),
       });
     } catch (error) {
       console.error('Job match analysis failed', error);
