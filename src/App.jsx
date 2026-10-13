@@ -2,8 +2,24 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, NavLink } from 'react-router-dom';
 import './App.css';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? 'http://localhost:8080/api' : '/api')
+).replace(/\/+$/, '');
 const USER_STORAGE_KEY = 'ai-resume-analyzer-user';
+const DEFAULT_JOB_TITLE = 'Full Stack Java Developer';
+const DEFAULT_JOB_DESCRIPTION = 'We are looking for a Full Stack Java Developer with experience in Java, Spring Boot, SQL, REST API, Git, and agile development.';
+const DEFAULT_MATCH_DATA = {
+  matchScore: 78,
+  matchingSkills: ['Java', 'Spring Boot', 'SQL', 'Git', 'REST API'],
+  missingSkills: ['Docker', 'AWS', 'Microservices', 'JUnit'],
+  keywords: ['Java', 'Spring Boot', 'SQL', 'REST API', 'Git'],
+  recommendations: ['Add AWS and Docker experience to the resume.', 'Improve the summary with measurable backend achievements.'],
+};
+
+function clampScore(score, min, max) {
+  return Math.max(min, Math.min(max, Number(score) || min));
+}
 
 function readStoredUser() {
   try {
@@ -18,7 +34,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(readStoredUser);
   const [authMode, setAuthMode] = useState(null);
   const [analysis, setAnalysis] = useState({
-    score: 82,
+    score: 70,
     skills: ['Java', 'Spring Boot', 'SQL', 'React', 'Git', 'REST API'],
     missingSkills: ['Docker', 'AWS', 'Microservices'],
     strengths: ['Strong Java and backend development skillset', 'Project examples are relevant and clear', 'Education is clearly listed'],
@@ -38,6 +54,7 @@ function App() {
       { section: 'Summary', status: '✓', details: 'Summary is professional and relevant.' },
     ],
   });
+  const [matchData, setMatchData] = useState(DEFAULT_MATCH_DATA);
   const [history, setHistory] = useState([]);
   const [selectedResumeId, setSelectedResumeId] = useState(null);
 
@@ -75,6 +92,7 @@ function App() {
     setCurrentUser(null);
     setHistory([]);
     setSelectedResumeId(null);
+    setMatchData(DEFAULT_MATCH_DATA);
   };
 
   return (
@@ -111,8 +129,8 @@ function App() {
 
         <Routes>
           <Route path="/" element={<HomePage onGetStarted={() => setAuthMode('register')} />} />
-          <Route path="/dashboard" element={<DashboardPage currentUser={currentUser} analysis={analysis} setAnalysis={setAnalysis} setHistory={setHistory} setSelectedResumeId={setSelectedResumeId} onLogin={() => setAuthMode('login')} />} />
-          <Route path="/job-match" element={<JobMatchPage selectedResumeId={selectedResumeId} />} />
+          <Route path="/dashboard" element={<DashboardPage currentUser={currentUser} analysis={analysis} matchData={matchData} setAnalysis={setAnalysis} setMatchData={setMatchData} setHistory={setHistory} setSelectedResumeId={setSelectedResumeId} onLogin={() => setAuthMode('login')} />} />
+          <Route path="/job-match" element={<JobMatchPage selectedResumeId={selectedResumeId} matchData={matchData} setMatchData={setMatchData} />} />
           <Route path="/history" element={<HistoryPage history={history} setSelectedResumeId={setSelectedResumeId} />} />
         </Routes>
         {authMode && <AuthDialog mode={authMode} onClose={() => setAuthMode(null)} onSuccess={handleAuthSuccess} />}
@@ -275,7 +293,7 @@ function AuthDialog({ mode, onClose, onSuccess }) {
   );
 }
 
-function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSelectedResumeId, onLogin }) {
+function DashboardPage({ currentUser, analysis, matchData, setAnalysis, setMatchData, setHistory, setSelectedResumeId, onLogin }) {
   const [resumeFile, setResumeFile] = useState(null);
   const [jobTitle, setJobTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -320,8 +338,23 @@ function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSele
       if (!analysisRes.ok) {
         throw new Error(analysisData.message || 'Resume analysis failed.');
       }
+
+      const matchRes = await fetch(`${API_BASE}/job-match/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resumeId,
+          jobTitle: DEFAULT_JOB_TITLE,
+          jobDescription: DEFAULT_JOB_DESCRIPTION,
+        }),
+      });
+      const matchResult = await matchRes.json();
+      if (!matchRes.ok) {
+        throw new Error(matchResult.message || 'Job match analysis failed.');
+      }
+
       setAnalysis({
-        score: analysisData.score ?? 82,
+        score: clampScore(analysisData.score, 60, 80),
         skills: analysisData.skills ?? [],
         missingSkills: analysisData.missingSkills ?? [],
         strengths: analysisData.strengths ?? [],
@@ -330,8 +363,12 @@ function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSele
         keywords: analysisData.keywords ?? [],
         sectionAnalysis: analysisData.sectionAnalysis ?? [],
       });
+      setMatchData({
+        ...matchResult,
+        matchScore: clampScore(matchResult.matchScore, 49, 83),
+      });
 
-      setStatusText('Resume analyzed successfully.');
+      setStatusText('Resume and job match analyzed successfully.');
       const historyRes = await fetch(`${API_BASE}/resumes?userId=${currentUser.userId}`);
       if (historyRes.ok) {
         const list = await historyRes.json();
@@ -384,6 +421,10 @@ function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSele
         <div className="summary-card">
           <span>Suggestions</span>
           <strong>{analysis.suggestions?.length ?? 0}</strong>
+        </div>
+        <div className="summary-card">
+          <span>Job Match</span>
+          <strong>{matchData.matchScore ?? 0}%</strong>
         </div>
       </div>
 
@@ -492,16 +533,9 @@ function DashboardPage({ currentUser, analysis, setAnalysis, setHistory, setSele
   );
 }
 
-function JobMatchPage({ selectedResumeId }) {
-  const [jobTitle, setJobTitle] = useState('Full Stack Java Developer');
-  const [jobDescription, setJobDescription] = useState('We are looking for a Full Stack Java Developer with experience in Java, Spring Boot, SQL, REST API, Git, and agile development.');
-  const [matchData, setMatchData] = useState({
-    matchScore: 78,
-    matchingSkills: ['Java', 'Spring Boot', 'SQL', 'Git', 'REST API'],
-    missingSkills: ['Docker', 'AWS', 'Microservices', 'JUnit'],
-    keywords: ['Java', 'Spring Boot', 'SQL', 'REST API', 'Git'],
-    recommendations: ['Add AWS and Docker experience to the resume.', 'Improve the summary with measurable backend achievements.'],
-  });
+function JobMatchPage({ selectedResumeId, matchData, setMatchData }) {
+  const [jobTitle, setJobTitle] = useState(DEFAULT_JOB_TITLE);
+  const [jobDescription, setJobDescription] = useState(DEFAULT_JOB_DESCRIPTION);
   const [errorMessage, setErrorMessage] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -522,7 +556,10 @@ function JobMatchPage({ selectedResumeId }) {
       if (!response.ok) {
         throw new Error(data.message || 'Job match analysis failed.');
       }
-      setMatchData(data);
+      setMatchData({
+        ...data,
+        matchScore: clampScore(data.matchScore, 49, 83),
+      });
     } catch (error) {
       console.error('Job match analysis failed', error);
       setErrorMessage(error.message || 'Could not connect to the backend.');
@@ -590,8 +627,8 @@ function HistoryPage({ history, setSelectedResumeId }) {
   const rows = history.length ? history.map((item) => ({
     name: item.fileName,
     date: new Date(item.uploadedAt).toLocaleDateString(),
-    score: item.score == null ? '—' : `${item.score}/100`,
-    match: item.jobMatchScore == null ? '—' : `${item.jobMatchScore}%`,
+    score: item.score == null ? '—' : `${clampScore(item.score, 60, 80)}/100`,
+    match: item.jobMatchScore == null ? '—' : `${clampScore(item.jobMatchScore, 49, 83)}%`,
     status: 'Reviewed',
     id: item.id,
   })) : [
